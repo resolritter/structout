@@ -2,10 +2,11 @@
 
 extern crate proc_macro;
 
+// LinkedHashSet is used instead of HashSet in order to insertion order across the board
+use linked_hash_set::LinkedHashSet;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use std::collections::HashSet;
 use std::iter::FromIterator;
 use syn::visit::Visit;
 use syn::{
@@ -18,7 +19,7 @@ use syn::{
 
 #[derive(Default)]
 struct TypeArgumentsCollectorVisitor {
-    items: HashSet<String>,
+    items: LinkedHashSet<String>,
 }
 
 impl<'ast> Visit<'ast> for TypeArgumentsCollectorVisitor {
@@ -28,8 +29,8 @@ impl<'ast> Visit<'ast> for TypeArgumentsCollectorVisitor {
 }
 
 struct TypeArgumentsCheckVisitor<'a> {
-    generics: &'a Vec<(&'a GenericArgument, HashSet<String>)>,
-    matched_generics: Vec<&'a (&'a GenericArgument, HashSet<String>)>,
+    generics: &'a Vec<(&'a GenericArgument, LinkedHashSet<String>)>,
+    matched_generics: Vec<&'a (&'a GenericArgument, LinkedHashSet<String>)>,
 }
 
 impl<'ast> Visit<'ast> for TypeArgumentsCheckVisitor<'ast> {
@@ -140,7 +141,7 @@ impl Parse for StructGen {
 }
 
 struct StructOutputConfiguration {
-    omitted_fields: HashSet<String>,
+    omitted_fields: LinkedHashSet<String>,
 }
 
 #[proc_macro]
@@ -157,7 +158,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
     let structs: Vec<(String, StructOutputConfiguration)> = conf
         .iter()
         .map(|c| {
-            let mut omitted_fields = HashSet::<String>::new();
+            let mut omitted_fields = LinkedHashSet::<String>::new();
 
             for a in c.actions.iter() {
                 let name: String = a.name.to_string();
@@ -177,7 +178,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let generics: Vec<(&GenericArgument, HashSet<String>)> = parsed_generics
+    let generics: Vec<(&GenericArgument, LinkedHashSet<String>)> = parsed_generics
         .args
         .iter()
         .map(|arg| {
@@ -190,7 +191,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let fields: Vec<(&Field, Vec<&(&GenericArgument, HashSet<String>)>)> = parsed_fields
+    let fields: Vec<(&Field, Vec<&(&GenericArgument, LinkedHashSet<String>)>)> = parsed_fields
         .iter()
         .map(|f| {
             let mut collector = TypeArgumentsCheckVisitor {
@@ -205,8 +206,8 @@ pub fn generate(input: TokenStream) -> TokenStream {
 
     let token_streams = structs.iter().map(
         |(struct_name, StructOutputConfiguration { omitted_fields })| {
-            let mut used_fields = HashSet::<&Field>::new();
-            let mut used_generics = HashSet::<&GenericArgument>::new();
+            let mut used_fields = LinkedHashSet::<&Field>::new();
+            let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
 
             for (f, f_generics) in fields.iter() {
                 if omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()) {
@@ -284,6 +285,28 @@ mod tests {
             }
             struct OnlyFoo {
                 foo: u32,
+            }
+        }
+        "###);
+    }
+
+    #[test]
+    fn simple() {
+        insta::assert_snapshot!(run_for_fixture("simple"), @r###"
+        pub mod simple {
+            use struct_gen::generate;
+            struct OnlyBar {
+                bar: u64,
+                baz: String,
+            }
+            struct OnlyFoo {
+                foo: u32,
+                baz: String,
+            }
+            struct Everything {
+                foo: u32,
+                bar: u64,
+                baz: String,
             }
         }
         "###);
