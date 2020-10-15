@@ -28,18 +28,18 @@ impl<'ast> Visit<'ast> for TypeArgumentsCollectorVisitor {
     }
 }
 
-struct TypeArgumentsCheckVisitor<'a> {
-    generics: &'a Vec<(&'a GenericArgument, LinkedHashSet<String>)>,
-    matched_generics: Vec<&'a (&'a GenericArgument, LinkedHashSet<String>)>,
+struct TypeArgumentsCheckVisitor<'ast> {
+    args: &'ast Vec<TypeArgumentConfiguration<'ast>>,
+    matched: Vec<&'ast TypeArgumentConfiguration<'ast>>,
 }
 
 impl<'ast> Visit<'ast> for TypeArgumentsCheckVisitor<'ast> {
     fn visit_ident(&mut self, id: &'ast Ident) {
         let name = &id.to_string();
-        for g in self.generics.iter() {
-            for ident in g.1.iter() {
-                if ident == name {
-                    self.matched_generics.push(g);
+        for arg in self.args.iter() {
+            for id in arg.identifiers.iter() {
+                if id == name {
+                    self.matched.push(arg);
                 }
             }
         }
@@ -167,6 +167,11 @@ struct StructOutputConfiguration<'ast> {
     attributes: Vec<&'ast Attribute>,
 }
 
+struct TypeArgumentConfiguration<'ast> {
+    arg: &'ast GenericArgument,
+    identifiers: LinkedHashSet<String>,
+}
+
 #[proc_macro]
 pub fn generate(input: TokenStream) -> TokenStream {
     let StructGen {
@@ -204,7 +209,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let generics: Vec<(&GenericArgument, LinkedHashSet<String>)> = parsed_generics
+    let generics: Vec<TypeArgumentConfiguration> = parsed_generics
         .args
         .iter()
         .map(|arg| {
@@ -213,14 +218,15 @@ pub fn generate(input: TokenStream) -> TokenStream {
             };
             collector.visit_generic_argument(arg);
 
-            (arg, collector.items)
+            TypeArgumentConfiguration {
+                arg,
+                identifiers: collector.items,
+            }
         })
         .collect();
 
-    let wheres: Vec<(
-        &WherePredicate,
-        Vec<&(&GenericArgument, LinkedHashSet<String>)>,
-    )> = if where_clause.is_some() {
+    let wheres: Vec<(&WherePredicate, Vec<&TypeArgumentConfiguration>)> = if where_clause.is_some()
+    {
         where_clause
             .as_ref()
             .unwrap()
@@ -228,28 +234,28 @@ pub fn generate(input: TokenStream) -> TokenStream {
             .iter()
             .map(|p| {
                 let mut collector = TypeArgumentsCheckVisitor {
-                    generics: &generics,
-                    matched_generics: Vec::new(),
+                    args: &generics,
+                    matched: Vec::new(),
                 };
                 collector.visit_where_predicate(&p);
 
-                (p, collector.matched_generics)
+                (p, collector.matched)
             })
             .collect()
     } else {
         Vec::new()
     };
 
-    let fields: Vec<(&Field, Vec<&(&GenericArgument, LinkedHashSet<String>)>)> = parsed_fields
+    let fields: Vec<(&Field, Vec<&TypeArgumentConfiguration>)> = parsed_fields
         .iter()
         .map(|f| {
             let mut collector = TypeArgumentsCheckVisitor {
-                generics: &generics,
-                matched_generics: Vec::new(),
+                args: &generics,
+                matched: Vec::new(),
             };
             collector.visit_type(&f.ty);
 
-            (f, collector.matched_generics)
+            (f, collector.matched)
         })
         .collect();
 
@@ -265,19 +271,19 @@ pub fn generate(input: TokenStream) -> TokenStream {
             let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
             let mut used_wheres = LinkedHashSet::<&WherePredicate>::new();
 
-            for (f, f_generics) in fields.iter() {
+            for (f, type_args) in fields.iter() {
                 if omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()) {
                     continue;
                 }
 
                 used_fields.insert(f);
 
-                for t in f_generics.iter() {
-                    used_generics.insert(t.0);
+                for type_arg in type_args.iter() {
+                    used_generics.insert(type_arg.arg);
 
                     for w in wheres.iter() {
-                        for (g, _) in w.1.iter() {
-                            if g == &t.0 {
+                        for w_type_arg in w.1.iter() {
+                            if &w_type_arg.arg == &type_arg.arg {
                                 used_wheres.insert(w.0);
                             }
                         }
