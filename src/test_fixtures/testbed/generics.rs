@@ -1,6 +1,6 @@
-use struct_gen::gen_generics;
+use struct_gen::generate;
 
-gen_generics!(
+generate!(
   <T> {
     foo: u32,
     bar: T

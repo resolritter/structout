@@ -144,7 +144,7 @@ struct StructOutputConfiguration {
 }
 
 #[proc_macro]
-pub fn gen_generics(input: TokenStream) -> TokenStream {
+pub fn generate(input: TokenStream) -> TokenStream {
     let StructGen {
         generics: parsed_generics,
         fields: parsed_fields,
@@ -278,7 +278,7 @@ mod tests {
     fn generics() {
         insta::assert_snapshot!(run_for_fixture("generics"), @r###"
         pub mod generics {
-            use struct_gen::gen_generics;
+            use struct_gen::generate;
             struct OnlyBar<T> {
                 bar: T,
             }
