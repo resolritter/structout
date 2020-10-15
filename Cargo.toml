@@ -1,13 +1,13 @@
 [package]
 name = "struct_gen"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-syn = { version = "*", features = ["full", "parsing", "extra-traits", "visit"] }
-proc-macro2 = "*"
-quote = "*"
-linked_hash_set = "*"
+syn = { version = "1.0.44", features = ["full", "parsing", "extra-traits", "visit"] }
+proc-macro2 = "1.0.24"
+quote = "1.0.7"
+linked_hash_set = "0.1.4"
 
 [lib]
 proc-macro = true
@@ -15,4 +15,4 @@ path = "src/lib.rs"
 
 [dev-dependencies]
 path-clean = "0.1.0"
-insta = "*"
+insta = "1.1.0"
