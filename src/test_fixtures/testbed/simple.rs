@@ -6,8 +6,8 @@ generate!(
     bar: u64,
     baz: String
   } => {
-    OnlyBar => [omit(foo)],
-    OnlyFoo => [omit(bar)],
-    Everything => [],
+    WithoutFoo => [omit(foo)],
+    WithoutBar => [omit(bar)],
+    WithAttrs => [attr(#[object(context=Database)]), attr(#[object(config="latest")])],
   }
 );

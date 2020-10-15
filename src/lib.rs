@@ -14,7 +14,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    token, Field, GenericArgument, Ident, Result, Token,
+    token, Attribute, Field, GenericArgument, Ident, Result, Token,
 };
 
 #[derive(Default)]
@@ -77,20 +77,34 @@ impl Parse for Generics {
     }
 }
 
+enum ActionVariant {
+    Omit(Punctuated<Ident, Token![,]>),
+    Attr(Punctuated<Attribute, Token![,]>),
+}
+
 struct Action {
-    name: Ident,
     parens: token::Paren,
-    fields: Punctuated<Ident, Token![,]>,
+    fields: ActionVariant,
 }
 
 impl Parse for Action {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
+        let name: Ident = input.parse()?;
+        let name_str = &name.to_string();
 
         Ok(Action {
-            name: input.parse()?,
             parens: parenthesized!(content in input),
-            fields: content.parse_terminated(Ident::parse)?,
+            fields: {
+                if name_str == &"omit" {
+                    ActionVariant::Omit(content.parse_terminated(Ident::parse)?)
+                } else if name_str == &"attr" {
+                    use syn::parse_quote::ParseQuote;
+                    ActionVariant::Attr(content.parse_terminated(Attribute::parse)?)
+                } else {
+                    panic!("{} is not a valid action", name_str)
+                }
+            },
         })
     }
 }
@@ -140,8 +154,9 @@ impl Parse for StructGen {
     }
 }
 
-struct StructOutputConfiguration {
+struct StructOutputConfiguration<'ast> {
     omitted_fields: LinkedHashSet<String>,
+    attributes: Vec<&'ast Attribute>,
 }
 
 #[proc_macro]
@@ -153,27 +168,29 @@ pub fn generate(input: TokenStream) -> TokenStream {
         ..
     } = parse_macro_input!(input as StructGen);
 
-    let omit_tag = String::from("omit");
-
     let structs: Vec<(String, StructOutputConfiguration)> = conf
         .iter()
         .map(|c| {
             let mut omitted_fields = LinkedHashSet::<String>::new();
+            let mut attributes = Vec::<&Attribute>::new();
 
             for a in c.actions.iter() {
-                let name: String = a.name.to_string();
-                if a.name == omit_tag {
-                    for f in a.fields.iter() {
-                        omitted_fields.insert(f.to_string());
+                match &a.fields {
+                    ActionVariant::Omit(fields) => {
+                        omitted_fields.extend(fields.iter().map(|f| f.to_string()));
                     }
-                } else {
-                    panic!(format!("{} is not a valid action", name));
+                    ActionVariant::Attr(attrs) => {
+                        attributes.extend(attrs.iter());
+                    }
                 }
             }
 
             (
                 c.struct_name.to_string(),
-                StructOutputConfiguration { omitted_fields },
+                StructOutputConfiguration {
+                    omitted_fields,
+                    attributes,
+                },
             )
         })
         .collect();
@@ -205,7 +222,13 @@ pub fn generate(input: TokenStream) -> TokenStream {
         .collect();
 
     let token_streams = structs.iter().map(
-        |(struct_name, StructOutputConfiguration { omitted_fields })| {
+        |(
+            struct_name,
+            StructOutputConfiguration {
+                omitted_fields,
+                attributes,
+            },
+        )| {
             let mut used_fields = LinkedHashSet::<&Field>::new();
             let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
 
@@ -223,6 +246,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
             let struct_name_ident = Ident::new(struct_name, Span::call_site());
 
             quote! {
+                #(#attributes)*
                 struct #struct_name_ident <#(#generic_items),*> {
                     #(#field_items),*
                 }
@@ -303,7 +327,9 @@ mod tests {
                 foo: u32,
                 baz: String,
             }
-            struct Everything {
+            # [object (context = Database)]
+            #[object(config = "latest")]
+            struct WithAttributes {
                 foo: u32,
                 bar: u64,
                 baz: String,
