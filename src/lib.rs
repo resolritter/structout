@@ -14,7 +14,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    token, Attribute, Field, GenericArgument, Ident, Result, Token,
+    token, Attribute, Field, GenericArgument, Ident, Result, Token, WhereClause, WherePredicate,
 };
 
 #[derive(Default)]
@@ -131,6 +131,7 @@ impl Parse for ConfigurationExpr {
 
 struct StructGen {
     generics: Generics,
+    where_clause: Option<WhereClause>,
     brace: token::Brace,
     fields: Punctuated<Field, Token![,]>,
     arrow: token::FatArrow,
@@ -145,6 +146,13 @@ impl Parse for StructGen {
 
         Ok(StructGen {
             generics: input.parse()?,
+            where_clause: {
+                if input.lookahead1().peek(Token![where]) {
+                    Some(input.parse()?)
+                } else {
+                    None
+                }
+            },
             brace: braced!(struct_content in input),
             fields: struct_content.parse_terminated(Field::parse_named)?,
             arrow: input.parse()?,
@@ -163,6 +171,7 @@ struct StructOutputConfiguration<'ast> {
 pub fn generate(input: TokenStream) -> TokenStream {
     let StructGen {
         generics: parsed_generics,
+        where_clause,
         fields: parsed_fields,
         conf,
         ..
@@ -208,6 +217,29 @@ pub fn generate(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let wheres: Vec<(
+        &WherePredicate,
+        Vec<&(&GenericArgument, LinkedHashSet<String>)>,
+    )> = if where_clause.is_some() {
+        where_clause
+            .as_ref()
+            .unwrap()
+            .predicates
+            .iter()
+            .map(|p| {
+                let mut collector = TypeArgumentsCheckVisitor {
+                    generics: &generics,
+                    matched_generics: Vec::new(),
+                };
+                collector.visit_where_predicate(&p);
+
+                (p, collector.matched_generics)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     let fields: Vec<(&Field, Vec<&(&GenericArgument, LinkedHashSet<String>)>)> = parsed_fields
         .iter()
         .map(|f| {
@@ -231,6 +263,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         )| {
             let mut used_fields = LinkedHashSet::<&Field>::new();
             let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
+            let mut used_wheres = LinkedHashSet::<&WherePredicate>::new();
 
             for (f, f_generics) in fields.iter() {
                 if omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()) {
@@ -238,17 +271,38 @@ pub fn generate(input: TokenStream) -> TokenStream {
                 }
 
                 used_fields.insert(f);
-                used_generics.extend(f_generics.iter().map(|t| t.0));
+
+                for t in f_generics.iter() {
+                    used_generics.insert(t.0);
+
+                    for w in wheres.iter() {
+                        for (g, _) in w.1.iter() {
+                            if g == &t.0 {
+                                used_wheres.insert(w.0);
+                            }
+                        }
+                    }
+                }
             }
 
             let field_items = Vec::from_iter(used_fields);
             let generic_items = Vec::from_iter(used_generics);
+            let where_items = Vec::from_iter(used_wheres);
             let struct_name_ident = Ident::new(struct_name, Span::call_site());
 
-            quote! {
-                #(#attributes)*
-                struct #struct_name_ident <#(#generic_items),*> {
-                    #(#field_items),*
+            if where_items.is_empty() {
+                quote! {
+                    #(#attributes)*
+                    struct #struct_name_ident <#(#generic_items),*> {
+                        #(#field_items),*
+                    }
+                }
+            } else {
+                quote! {
+                    #(#attributes)*
+                    struct #struct_name_ident <#(#generic_items),*> where #(#where_items),* {
+                        #(#field_items),*
+                    }
                 }
             }
         },
@@ -315,21 +369,42 @@ mod tests {
     }
 
     #[test]
+    fn wheres() {
+        insta::assert_snapshot!(run_for_fixture("wheres"), @r###"
+        pub mod wheres {
+            use struct_gen::generate;
+            struct OnlyBar<G>
+            where
+                G: Copy,
+            {
+                bar: G,
+            }
+            struct OnlyFoo<T>
+            where
+                T: Sized,
+            {
+                foo: T,
+            }
+        }
+        "###);
+    }
+
+    #[test]
     fn simple() {
         insta::assert_snapshot!(run_for_fixture("simple"), @r###"
         pub mod simple {
             use struct_gen::generate;
-            struct OnlyBar {
+            struct WithoutFoo {
                 bar: u64,
                 baz: String,
             }
-            struct OnlyFoo {
+            struct WithoutBar {
                 foo: u32,
                 baz: String,
             }
             # [object (context = Database)]
             #[object(config = "latest")]
-            struct WithAttributes {
+            struct WithAttrs {
                 foo: u32,
                 bar: u64,
                 baz: String,
