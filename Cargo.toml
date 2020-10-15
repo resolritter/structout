@@ -1,5 +1,11 @@
 [package]
 name = "struct_gen"
+authors = ["resolritter <joao.paulo.silvasouza@hotmail.com>"]
+description = "A proc-macro for generating structs from a common definition"
+homepage = "https://github.com/resolritter/struct_gen"
+repository = "https://github.com/resolritter/struct_gen"
+include = ["Cargo.toml", "src/**/*.rs", "README.md", "LICENSE"]
+license = "BSD-3-Clause"
 version = "0.1.0"
 edition = "2018"
 
