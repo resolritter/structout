@@ -1,1 +1,5 @@
+# default
 /target
+
+# cargo-insta
+*.pending-snap

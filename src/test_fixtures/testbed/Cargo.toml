@@ -1,0 +1,13 @@
+[package]
+name = "testbed"
+version = "0.1.0"
+description = "Tests struct_gen"
+authors = ["resolritter <joao.paulo.silvasouza@hotmail.com>"]
+edition = "2018"
+
+[dependencies]
+struct_gen = { path = "../../.." }
+
+[lib]
+name = "testbed"
+path = "mod.rs"

@@ -11,3 +11,7 @@ quote = "*"
 [lib]
 proc-macro = true
 path = "src/lib.rs"
+
+[dev-dependencies]
+path-clean = "0.1.0"
+insta = "*"

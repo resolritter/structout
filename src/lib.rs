@@ -232,3 +232,58 @@ pub fn gen_generics(input: TokenStream) -> TokenStream {
     })
     .into()
 }
+
+#[cfg(test)]
+mod tests {
+    use path_clean::PathClean;
+    use std::env;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    pub fn absolute_path(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+        let path = path.as_ref();
+
+        let absolute_path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            env::current_dir()?.join(path)
+        }
+        .clean();
+
+        Ok(absolute_path)
+    }
+
+    fn run_for_fixture(fixture: &str) -> String {
+        let output = Command::new("cargo")
+            .arg("expand")
+            .arg(fixture)
+            .arg("--manifest-path")
+            .arg(format!(
+                "{}",
+                absolute_path("./src/test_fixtures/testbed/Cargo.toml")
+                    .unwrap()
+                    .display()
+            ))
+            .output()
+            .expect("Failed to spawn process");
+
+        String::from_utf8_lossy(&output.stdout)
+            .to_owned()
+            .to_string()
+    }
+
+    #[test]
+    fn generics() {
+        insta::assert_snapshot!(run_for_fixture("generics"), @r###"
+        pub mod generics {
+            use struct_gen::gen_generics;
+            struct OnlyBar<T> {
+                bar: T,
+            }
+            struct OnlyFoo {
+                foo: u32,
+            }
+        }
+        "###);
+    }
+}
