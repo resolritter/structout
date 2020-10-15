@@ -4,4 +4,10 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-lib = { path = "src/lib" }
+syn = { version = "*", features = ["full", "parsing", "extra-traits", "visit"] }
+proc-macro2 = "*"
+quote = "*"
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
