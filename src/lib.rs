@@ -85,6 +85,7 @@ struct Action {
 impl Parse for Action {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
+
         Ok(Action {
             name: input.parse()?,
             parens: parenthesized!(content in input),
@@ -95,19 +96,20 @@ impl Parse for Action {
 
 struct ConfigurationExpr {
     struct_name: Ident,
+    arrow: Token![=>],
+    bracket: token::Bracket,
     actions: Punctuated<Action, Token![,]>,
 }
 
 impl Parse for ConfigurationExpr {
     fn parse(input: ParseStream) -> Result<Self> {
         let struct_content;
-        let struct_name = input.parse()?;
-        input.parse::<Token![=>]>()?;
-        bracketed!(struct_content in input);
-        let actions = struct_content.parse_terminated(Action::parse)?;
+
         Ok(ConfigurationExpr {
-            struct_name,
-            actions,
+            struct_name: input.parse()?,
+            arrow: input.parse::<Token![=>]>()?,
+            bracket: bracketed!(struct_content in input),
+            actions: struct_content.parse_terminated(Action::parse)?,
         })
     }
 }
@@ -206,22 +208,22 @@ pub fn gen_generics(input: TokenStream) -> TokenStream {
             let mut used_fields = HashSet::<&Field>::new();
             let mut used_generics = HashSet::<&GenericArgument>::new();
 
-            for (f, gs) in fields.iter() {
+            for (f, f_generics) in fields.iter() {
                 if omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()) {
                     continue;
                 }
 
                 used_fields.insert(f);
-                used_generics.extend(gs.iter().map(|t| t.0));
+                used_generics.extend(f_generics.iter().map(|t| t.0));
             }
 
-            let u_fields = Vec::from_iter(used_fields);
-            let u_generics = Vec::from_iter(used_generics);
+            let field_items = Vec::from_iter(used_fields);
+            let generic_items = Vec::from_iter(used_generics);
             let struct_name_ident = Ident::new(struct_name, Span::call_site());
 
             quote! {
-                struct #struct_name_ident <#(#u_generics),*> {
-                    #(#u_fields),*
+                struct #struct_name_ident <#(#generic_items),*> {
+                    #(#field_items),*
                 }
             }
         },
