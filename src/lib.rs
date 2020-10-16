@@ -1,3 +1,4 @@
+#![allow(clippy::eval_order_dependence)]
 extern crate proc_macro;
 
 // LinkedHashSet is used instead of HashSet in order to insertion order across the board
@@ -46,8 +47,10 @@ impl<'ast> Visit<'ast> for TypeArgumentsCheckVisitor<'ast> {
 }
 
 struct Generics {
+    #[allow(dead_code)]
     start: Token![<],
     args: Punctuated<GenericArgument, Token![,]>,
+    #[allow(dead_code)]
     end: Token![>],
 }
 
@@ -82,6 +85,7 @@ enum ActionVariant {
 }
 
 struct Action {
+    #[allow(dead_code)]
     parens: token::Paren,
     fields: ActionVariant,
 }
@@ -95,9 +99,9 @@ impl Parse for Action {
         Ok(Action {
             parens: parenthesized!(content in input),
             fields: {
-                if name_str == &"omit" {
+                if name_str == "omit" {
                     ActionVariant::Omit(content.parse_terminated(Ident::parse)?)
-                } else if name_str == &"attr" {
+                } else if name_str == "attr" {
                     use syn::parse_quote::ParseQuote;
                     ActionVariant::Attr(content.parse_terminated(Attribute::parse)?)
                 } else {
@@ -110,7 +114,9 @@ impl Parse for Action {
 
 struct ConfigurationExpr {
     struct_name: Ident,
+    #[allow(dead_code)]
     arrow: Token![=>],
+    #[allow(dead_code)]
     bracket: token::Bracket,
     actions: Punctuated<Action, Token![,]>,
 }
@@ -132,9 +138,12 @@ struct StructGen {
     visibility: Option<Visibility>,
     generics: Generics,
     where_clause: Option<WhereClause>,
+    #[allow(dead_code)]
     brace: token::Brace,
     fields: Punctuated<Field, Token![,]>,
+    #[allow(dead_code)]
     arrow: token::FatArrow,
+    #[allow(dead_code)]
     conf_brace: token::Brace,
     conf: Punctuated<ConfigurationExpr, Token![,]>,
 }
@@ -291,7 +300,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
 
                     for w in wheres.iter() {
                         for w_type_arg in w.1.iter() {
-                            if &w_type_arg.arg == &type_arg.arg {
+                            if w_type_arg.arg == type_arg.arg {
                                 used_wheres.insert(w.0);
                             }
                         }
