@@ -6,7 +6,7 @@ This library allows for generating multiple structs from a single definition thr
 
 ```
 generate!(
-  <...> where ... {
+  visibility <...> where ... {
     field: type,
     ...
   } => {
@@ -15,8 +15,9 @@ generate!(
 )
 ```
 
+- (optional) `visibility` is self-explanatory - check [Visibility and Privacy](https://doc.rust-lang.org/reference/visibility-and-privacy.html)
 - `<...>` represents the type arguments
-- `where ...` represents the type constraints
+- (optional) `where ...` represents the type constraints
 - `{ field: type, ... }` is the common *struct body* which will be used for generating new structs.
 - `{ OutputStruct => [action(arg), ...] }` is the output configuration, where each entry maps to one new struct being generated; further:
    - `OutputStruct` is the name of the struct
