@@ -1,6 +1,6 @@
 [package]
 name = "testbed"
-version = "0.1.0"
+version = "0.1.2"
 description = "Tests structout"
 authors = ["resolritter <joao.paulo.silvasouza@hotmail.com>"]
 edition = "2018"

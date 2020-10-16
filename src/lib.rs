@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 extern crate proc_macro;
 
 // LinkedHashSet is used instead of HashSet in order to insertion order across the board
