@@ -1,4 +1,4 @@
-use struct_gen::generate;
+use structout::generate;
 
 generate!(
   <T, G> where T: Sized, G: Copy {

@@ -34,8 +34,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "struct_gen"
-version = "0.0.1"
+name = "structout"
+version = "0.1.0"
 dependencies = [
  "linked_hash_set",
  "proc-macro2",
@@ -58,7 +58,7 @@ dependencies = [
 name = "testbed"
 version = "0.1.0"
 dependencies = [
- "struct_gen",
+ "structout",
 ]
 
 [[package]]

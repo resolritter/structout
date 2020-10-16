@@ -363,7 +363,7 @@ mod tests {
     fn generics() {
         insta::assert_snapshot!(run_for_fixture("generics"), @r###"
         pub mod generics {
-            use struct_gen::generate;
+            use structout::generate;
             struct OnlyBar<T> {
                 bar: T,
             }
@@ -378,7 +378,7 @@ mod tests {
     fn wheres() {
         insta::assert_snapshot!(run_for_fixture("wheres"), @r###"
         pub mod wheres {
-            use struct_gen::generate;
+            use structout::generate;
             struct OnlyBar<G>
             where
                 G: Copy,
@@ -399,7 +399,7 @@ mod tests {
     fn simple() {
         insta::assert_snapshot!(run_for_fixture("simple"), @r###"
         pub mod simple {
-            use struct_gen::generate;
+            use structout::generate;
             struct WithoutFoo {
                 bar: u64,
                 baz: String,

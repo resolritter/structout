@@ -1,12 +1,12 @@
 [package]
 name = "testbed"
 version = "0.1.0"
-description = "Tests struct_gen"
+description = "Tests structout"
 authors = ["resolritter <joao.paulo.silvasouza@hotmail.com>"]
 edition = "2018"
 
 [dependencies]
-struct_gen = { path = "../../.." }
+structout = { path = "../../.." }
 
 [lib]
 name = "testbed"

@@ -1,4 +1,4 @@
-# struct_gen
+# structout
 
 # Usage
 
@@ -30,7 +30,7 @@ Where "actions" can be one of:
 Put into practice:
 
 ```rust
-use struct_gen::generate;
+use structout::generate;
 
 generate!(
   <> {
