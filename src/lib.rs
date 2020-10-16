@@ -14,7 +14,8 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    token, Attribute, Field, GenericArgument, Ident, Result, Token, WhereClause, WherePredicate,
+    token, Attribute, Field, GenericArgument, Ident, Result, Token, Visibility, WhereClause,
+    WherePredicate,
 };
 
 #[derive(Default)]
@@ -130,6 +131,7 @@ impl Parse for ConfigurationExpr {
 }
 
 struct StructGen {
+    visibility: Option<Visibility>,
     generics: Generics,
     where_clause: Option<WhereClause>,
     brace: token::Brace,
@@ -145,6 +147,13 @@ impl Parse for StructGen {
         let conf_content;
 
         Ok(StructGen {
+            visibility: {
+                if input.lookahead1().peek(Token![pub]) {
+                    Some(input.parse()?)
+                } else {
+                    None
+                }
+            },
             generics: input.parse()?,
             where_clause: {
                 if input.lookahead1().peek(Token![where]) {
@@ -179,6 +188,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         where_clause,
         fields: parsed_fields,
         conf,
+        visibility,
         ..
     } = parse_macro_input!(input as StructGen);
 
@@ -299,14 +309,14 @@ pub fn generate(input: TokenStream) -> TokenStream {
             if where_items.is_empty() {
                 quote! {
                     #(#attributes)*
-                    struct #struct_name_ident <#(#generic_items),*> {
+                    #visibility struct #struct_name_ident <#(#generic_items),*> {
                         #(#field_items),*
                     }
                 }
             } else {
                 quote! {
                     #(#attributes)*
-                    struct #struct_name_ident <#(#generic_items),*> where #(#where_items),* {
+                    #visibility struct #struct_name_ident <#(#generic_items),*> where #(#where_items),* {
                         #(#field_items),*
                     }
                 }
@@ -414,6 +424,18 @@ mod tests {
                 foo: u32,
                 bar: u64,
                 baz: String,
+            }
+        }
+        "###);
+    }
+
+    #[test]
+    fn visibility() {
+        insta::assert_snapshot!(run_for_fixture("visibility"), @r###"
+        pub mod visibility {
+            use structout::generate;
+            pub(crate) struct Everything {
+                foo: u32,
             }
         }
         "###);
