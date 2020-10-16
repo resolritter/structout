@@ -379,17 +379,17 @@ mod tests {
         insta::assert_snapshot!(run_for_fixture("wheres"), @r###"
         pub mod wheres {
             use structout::generate;
-            struct OnlyBar<G>
+            struct OnlyBar<C>
             where
-                G: Copy,
+                C: Copy,
             {
-                bar: G,
+                bar: C,
             }
-            struct OnlyFoo<T>
+            struct OnlyFoo<S>
             where
-                T: Sized,
+                S: Sized,
             {
-                foo: T,
+                foo: S,
             }
         }
         "###);

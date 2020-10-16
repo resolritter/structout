@@ -1,9 +1,9 @@
 use structout::generate;
 
 generate!(
-  <T, G> where T: Sized, G: Copy {
-    foo: T,
-    bar: G
+  <S, C> where S: Sized, C: Copy {
+    foo: S,
+    bar: C
   } => {
     OnlyBar => [omit(foo)],
     OnlyFoo => [omit(bar)],
