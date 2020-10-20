@@ -5,7 +5,7 @@ generate!(
     foo: u32,
     bar: u64
   } => {
-    WithoutFoo => [only(bar)],
-    WithoutBar => [only(foo)],
+    WithoutFoo => [include(bar)],
+    WithoutBar => [include(foo)],
   }
 );

@@ -81,7 +81,7 @@ impl Parse for Generics {
 
 enum ActionVariant {
     Omit(Punctuated<Ident, Token![,]>),
-    Only(Punctuated<Ident, Token![,]>),
+    Include(Punctuated<Ident, Token![,]>),
     Attr(Punctuated<Attribute, Token![,]>),
 }
 
@@ -102,8 +102,8 @@ impl Parse for Action {
             fields: {
                 if name_str == "omit" {
                     ActionVariant::Omit(content.parse_terminated(Ident::parse)?)
-                } else if name_str == "only" {
-                    ActionVariant::Only(content.parse_terminated(Ident::parse)?)
+                } else if name_str == "include" {
+                    ActionVariant::Include(content.parse_terminated(Ident::parse)?)
                 } else if name_str == "attr" {
                     use syn::parse_quote::ParseQuote;
                     ActionVariant::Attr(content.parse_terminated(Attribute::parse)?)
@@ -183,7 +183,7 @@ impl Parse for StructGen {
 
 struct StructOutputConfiguration<'ast> {
     omitted_fields: LinkedHashSet<String>,
-    only_fields: LinkedHashSet<String>,
+    included_fields: LinkedHashSet<String>,
     attributes: Vec<&'ast Attribute>,
 }
 
@@ -207,7 +207,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
         .iter()
         .map(|c| {
             let mut omitted_fields = LinkedHashSet::<String>::new();
-            let mut only_fields = LinkedHashSet::<String>::new();
+            let mut included_fields = LinkedHashSet::<String>::new();
             let mut attributes = Vec::<&Attribute>::new();
 
             for a in c.actions.iter() {
@@ -215,8 +215,8 @@ pub fn generate(input: TokenStream) -> TokenStream {
                     ActionVariant::Omit(fields) => {
                         omitted_fields.extend(fields.iter().map(|f| f.to_string()));
                     }
-                    ActionVariant::Only(fields) => {
-                        only_fields.extend(fields.iter().map(|f| f.to_string()));
+                    ActionVariant::Include(fields) => {
+                        included_fields.extend(fields.iter().map(|f| f.to_string()));
                     }
                     ActionVariant::Attr(attrs) => {
                         attributes.extend(attrs.iter());
@@ -228,7 +228,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
                 c.struct_name.to_string(),
                 StructOutputConfiguration {
                     omitted_fields,
-                    only_fields,
+                    included_fields,
                     attributes,
                 },
             )
@@ -291,17 +291,17 @@ pub fn generate(input: TokenStream) -> TokenStream {
             StructOutputConfiguration {
                 omitted_fields,
                 attributes,
-                only_fields
+                included_fields
             },
         )| {
             let mut used_fields = LinkedHashSet::<&Field>::new();
             let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
             let mut used_wheres = LinkedHashSet::<&WherePredicate>::new();
 
-            let test_skip_predicate: Box<dyn Fn(&Field) -> bool> = if only_fields.is_empty() {
+            let test_skip_predicate: Box<dyn Fn(&Field) -> bool> = if included_fields.is_empty() {
                 Box::new(|f: &Field| omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()))
             } else {
-                Box::new(|f: &Field| !only_fields.contains(&f.ident.as_ref().unwrap().to_string()))
+                Box::new(|f: &Field| !included_fields.contains(&f.ident.as_ref().unwrap().to_string()))
             };
 
             for (f, type_args) in fields.iter() {
@@ -465,9 +465,9 @@ mod tests {
     }
 
     #[test]
-    fn only() {
-        insta::assert_snapshot!(run_for_fixture("only"), @r###"
-        pub mod only {
+    fn include() {
+        insta::assert_snapshot!(run_for_fixture("include"), @r###"
+        pub mod include {
             use structout::generate;
             struct WithoutFoo {
                 bar: u64,
