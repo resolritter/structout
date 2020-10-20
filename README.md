@@ -25,8 +25,9 @@ generate!(
 
 Where "actions" can be one of:
 
-- `omit(fields)` omits the fields from this struct definition
-- `attr(attrs)` inserts an attribute before the struct definition
+- `omit(fields)` omits the fields from this struct definition.
+- `include(fields)` **has precedence over `omit`**. Includes the fields in this struct definition.
+- `attr(args)` inserts an attribute before the struct definition.
 
 Put into practice:
 
