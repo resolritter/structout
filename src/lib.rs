@@ -380,7 +380,7 @@ mod tests {
             .arg("--manifest-path")
             .arg(format!(
                 "{}",
-                absolute_path("./src/test_fixtures/testbed/Cargo.toml")
+                absolute_path("./test_fixtures/testbed/Cargo.toml")
                     .unwrap()
                     .display()
             ))

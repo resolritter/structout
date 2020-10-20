@@ -6,7 +6,7 @@ authors = ["resolritter <joao.paulo.silvasouza@hotmail.com>"]
 edition = "2018"
 
 [dependencies]
-structout = { path = "../../.." }
+structout = { path = "../.." }
 
 [lib]
 name = "testbed"
