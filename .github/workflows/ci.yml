@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+  INSTA_UPDATE: no
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        # nightly is needed due to cargo expand
+        toolchain: nightly
+        profile: minimal
+        override: true
+        components: rustfmt, rust-src
+        
+    - name: Run tests
+      run: |
+         cargo install cargo-expand && \
+         cargo test --verbose
