@@ -6,7 +6,7 @@ homepage = "https://github.com/resolritter/structout"
 repository = "https://github.com/resolritter/structout"
 include = ["Cargo.toml", "src/**/*.rs", "README.md", "LICENSE"]
 license = "BSD-3-Clause"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2018"
 
 [dependencies]
