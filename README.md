@@ -28,6 +28,7 @@ Where "actions" can be one of:
 - `omit(fields)` omits the fields from this struct definition.
 - `include(fields)` **has precedence over `omit`**. Includes the fields in this struct definition.
 - `attr(args)` inserts an attribute before the struct definition.
+- `as_tuple()` outputs the struct as a tuple struct.
 
 Put into practice:
 

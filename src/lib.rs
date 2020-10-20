@@ -13,7 +13,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    token, Attribute, Field, GenericArgument, Ident, Result, Token, Visibility, WhereClause,
+    token, Attribute, Field, GenericArgument, Ident, Result, Token, Type, Visibility, WhereClause,
     WherePredicate,
 };
 
@@ -83,6 +83,7 @@ enum ActionVariant {
     Omit(Punctuated<Ident, Token![,]>),
     Include(Punctuated<Ident, Token![,]>),
     Attr(Punctuated<Attribute, Token![,]>),
+    AsTuple,
 }
 
 struct Action {
@@ -104,6 +105,8 @@ impl Parse for Action {
                     ActionVariant::Omit(content.parse_terminated(Ident::parse)?)
                 } else if name_str == "include" {
                     ActionVariant::Include(content.parse_terminated(Ident::parse)?)
+                } else if name_str == "as_tuple" {
+                    ActionVariant::AsTuple
                 } else if name_str == "attr" {
                     use syn::parse_quote::ParseQuote;
                     ActionVariant::Attr(content.parse_terminated(Attribute::parse)?)
@@ -185,6 +188,7 @@ struct StructOutputConfiguration<'ast> {
     omitted_fields: LinkedHashSet<String>,
     included_fields: LinkedHashSet<String>,
     attributes: Vec<&'ast Attribute>,
+    is_tuple: bool,
 }
 
 struct TypeArgumentConfiguration<'ast> {
@@ -209,6 +213,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
             let mut omitted_fields = LinkedHashSet::<String>::new();
             let mut included_fields = LinkedHashSet::<String>::new();
             let mut attributes = Vec::<&Attribute>::new();
+            let mut is_tuple = false;
 
             for a in c.actions.iter() {
                 match &a.fields {
@@ -221,6 +226,9 @@ pub fn generate(input: TokenStream) -> TokenStream {
                     ActionVariant::Attr(attrs) => {
                         attributes.extend(attrs.iter());
                     }
+                    ActionVariant::AsTuple => {
+                        is_tuple = true;
+                    }
                 }
             }
 
@@ -230,6 +238,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
                     omitted_fields,
                     included_fields,
                     attributes,
+                    is_tuple,
                 },
             )
         })
@@ -291,10 +300,12 @@ pub fn generate(input: TokenStream) -> TokenStream {
             StructOutputConfiguration {
                 omitted_fields,
                 attributes,
-                included_fields
+                included_fields,
+                is_tuple
             },
         )| {
             let mut used_fields = LinkedHashSet::<&Field>::new();
+            let mut used_types = LinkedHashSet::<&Type>::new();
             let mut used_generics = LinkedHashSet::<&GenericArgument>::new();
             let mut used_wheres = LinkedHashSet::<&WherePredicate>::new();
 
@@ -309,7 +320,11 @@ pub fn generate(input: TokenStream) -> TokenStream {
                     continue;
                 }
 
-                used_fields.insert(f);
+                if *is_tuple {
+                    used_types.insert(&f.ty);
+                } else {
+                    used_fields.insert(f);
+                }
 
                 for type_arg in type_args.iter() {
                     used_generics.insert(type_arg.arg);
@@ -325,11 +340,23 @@ pub fn generate(input: TokenStream) -> TokenStream {
             }
 
             let field_items = Vec::from_iter(used_fields);
+            let type_items = Vec::from_iter(used_types);
             let generic_items = Vec::from_iter(used_generics);
             let where_items = Vec::from_iter(used_wheres);
             let struct_name_ident = Ident::new(struct_name, Span::call_site());
-
-            if where_items.is_empty() {
+            if *is_tuple {
+                if where_items.is_empty() {
+                    quote! {
+                        #(#attributes)*
+                        #visibility struct #struct_name_ident <#(#generic_items),*> (#(#type_items),*);
+                    }
+                } else {
+                    quote! {
+                        #(#attributes)*
+                        #visibility struct #struct_name_ident <#(#generic_items),*> (#(#type_items),*) where #(#where_items),*;
+                    }
+                }
+            } else if where_items.is_empty() {
                 quote! {
                     #(#attributes)*
                     #visibility struct #struct_name_ident <#(#generic_items),*> {
@@ -475,6 +502,21 @@ mod tests {
             struct WithoutBar {
                 foo: u32,
             }
+        }
+        "###);
+    }
+
+    #[test]
+    fn as_tuple() {
+        insta::assert_snapshot!(run_for_fixture("as_tuple"), @r###"
+        pub mod as_tuple {
+            use structout::generate;
+            struct OnlyBar<C>(C, i32)
+            where
+                C: Copy;
+            struct OnlyFoo<S>(S, i32)
+            where
+                S: Sized;
         }
         "###);
     }
