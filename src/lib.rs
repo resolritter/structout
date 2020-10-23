@@ -83,6 +83,7 @@ enum ActionVariant {
     Omit(Punctuated<Ident, Token![,]>),
     Include(Punctuated<Ident, Token![,]>),
     Attr(Punctuated<Attribute, Token![,]>),
+    Upsert(Punctuated<Field, Token![,]>),
     AsTuple,
 }
 
@@ -110,6 +111,8 @@ impl Parse for Action {
                 } else if name_str == "attr" {
                     use syn::parse_quote::ParseQuote;
                     ActionVariant::Attr(content.parse_terminated(Attribute::parse)?)
+                } else if name_str == "upsert" {
+                    ActionVariant::Upsert(content.parse_terminated(Field::parse_named)?)
                 } else {
                     panic!("{} is not a valid action", name_str)
                 }
@@ -187,6 +190,8 @@ impl Parse for StructGen {
 struct StructOutputConfiguration<'ast> {
     omitted_fields: LinkedHashSet<String>,
     included_fields: LinkedHashSet<String>,
+    upsert_fields_names: LinkedHashSet<String>,
+    upsert_fields: Vec<&'ast Field>,
     attributes: Vec<&'ast Attribute>,
     is_tuple: bool,
 }
@@ -212,6 +217,8 @@ pub fn generate(input: TokenStream) -> TokenStream {
         .map(|c| {
             let mut omitted_fields = LinkedHashSet::<String>::new();
             let mut included_fields = LinkedHashSet::<String>::new();
+            let mut upsert_fields = Vec::<&Field>::new();
+            let mut upsert_fields_names = LinkedHashSet::<String>::new();
             let mut attributes = Vec::<&Attribute>::new();
             let mut is_tuple = false;
 
@@ -226,6 +233,11 @@ pub fn generate(input: TokenStream) -> TokenStream {
                     ActionVariant::Attr(attrs) => {
                         attributes.extend(attrs.iter());
                     }
+                    ActionVariant::Upsert(fields) => {
+                        upsert_fields_names
+                            .extend(fields.iter().map(|f| f.ident.as_ref().unwrap().to_string()));
+                        upsert_fields.extend(fields);
+                    }
                     ActionVariant::AsTuple => {
                         is_tuple = true;
                     }
@@ -237,6 +249,8 @@ pub fn generate(input: TokenStream) -> TokenStream {
                 StructOutputConfiguration {
                     omitted_fields,
                     included_fields,
+                    upsert_fields,
+                    upsert_fields_names,
                     attributes,
                     is_tuple,
                 },
@@ -301,6 +315,8 @@ pub fn generate(input: TokenStream) -> TokenStream {
                 omitted_fields,
                 attributes,
                 included_fields,
+                upsert_fields,
+                upsert_fields_names,
                 is_tuple
             },
         )| {
@@ -310,9 +326,15 @@ pub fn generate(input: TokenStream) -> TokenStream {
             let mut used_wheres = LinkedHashSet::<&WherePredicate>::new();
 
             let test_skip_predicate: Box<dyn Fn(&Field) -> bool> = if included_fields.is_empty() {
-                Box::new(|f: &Field| omitted_fields.contains(&f.ident.as_ref().unwrap().to_string()))
+                Box::new(|f: &Field| {
+                    let name = &f.ident.as_ref().unwrap().to_string();
+                    upsert_fields_names.contains(name) || omitted_fields.contains(name)
+                })
             } else {
-                Box::new(|f: &Field| !included_fields.contains(&f.ident.as_ref().unwrap().to_string()))
+                Box::new(|f: &Field| {
+                    let name = &f.ident.as_ref().unwrap().to_string();
+                    upsert_fields_names.contains(name) || !included_fields.contains(name)
+                })
             };
 
             for (f, type_args) in fields.iter() {
@@ -337,6 +359,11 @@ pub fn generate(input: TokenStream) -> TokenStream {
                         }
                     }
                 }
+            }
+            if *is_tuple {
+                used_types.extend(upsert_fields.iter().map(|f| &f.ty));
+            } else {
+                used_fields.extend(upsert_fields.iter());
             }
 
             let field_items = Vec::from_iter(used_fields);
@@ -518,6 +545,25 @@ mod tests {
             where
                 S: Sized;
         }
+        "###);
+    }
+
+    #[test]
+    fn upsert() {
+        insta::assert_snapshot!(run_for_fixture("upsert"), @r###"
+        pub mod upsert {
+            use structout::generate;
+            struct NewFields {
+                foo: u32,
+                bar: i32,
+                baz: i64,
+            }
+            struct OverriddenField {
+                foo: u64,
+            }
+            struct Tupled(u64);
+        }
+        
         "###);
     }
 }

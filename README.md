@@ -25,10 +25,11 @@ generate!(
 
 Where "actions" can be one of:
 
-- `omit(fields)` omits the fields from this struct definition.
-- `include(fields)` **has precedence over `omit`**. Includes the fields in this struct definition.
+- `omit(fields_names)` omits the fields from this struct definition.
+- `include(fields_names)` **has precedence over `omit`**. Includes the fields in this struct definition.
 - `attr(args)` inserts an attribute before the struct definition.
 - `as_tuple()` outputs the struct as a tuple struct.
+- `upsert(fields)` will either `up`date or in`sert` the field with the specified type (i.e. replace the field definition if one exists with the same identifier or, otherwise, insert a new one).
 
 Put into practice:
 
