@@ -1,7 +1,7 @@
 use structout::generate;
 
 generate!(
-  pub(crate) <> {
+  pub(crate) {
     foo: u32,
   } => {
     Everything => [],

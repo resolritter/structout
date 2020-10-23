@@ -6,6 +6,7 @@ This library allows for generating multiple structs from a single definition thr
 
 ```
 generate!(
+  attributes
   visibility <...> where ... {
     field: type,
     ...
@@ -15,9 +16,10 @@ generate!(
 )
 ```
 
-- (optional) `visibility` is self-explanatory - check [Visibility and Privacy](https://doc.rust-lang.org/reference/visibility-and-privacy.html)
-- `<...>` represents the type arguments
-- (optional) `where ...` represents the type constraints
+- (optional) `attributes` is applied to **all** variants.
+- (optional) `visibility` is applied to **all** variants.
+- (optional) `<...>` are the type arguments (a.k.a generics); they shouldn't get included if they don't get used.
+- (optional) `where ...` represents the type constraints.
 - `{ field: type, ... }` is the common *struct body* which will be used for generating new structs.
 - `{ OutputStruct => [action(arg), ...] }` is the output configuration, where each entry maps to one new struct being generated; further:
    - `OutputStruct` is the name of the struct
@@ -37,7 +39,7 @@ Put into practice:
 use structout::generate;
 
 generate!(
-  <> {
+  {
     foo: u32,
     bar: u64,
     baz: String

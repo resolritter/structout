@@ -1,7 +1,7 @@
 use structout::generate;
 
 generate!(
-  <> {
+  {
     foo: u32,
   } => {
     NewFields => [upsert(bar: i32, baz: i64)],

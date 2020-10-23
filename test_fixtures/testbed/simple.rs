@@ -1,7 +1,7 @@
 use structout::generate;
 
 generate!(
-  <> {
+  {
     foo: u32,
     bar: u64,
     baz: String

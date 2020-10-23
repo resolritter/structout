@@ -144,8 +144,9 @@ impl Parse for ConfigurationExpr {
 }
 
 struct StructGen {
+    attrs: Vec<Attribute>,
     visibility: Option<Visibility>,
-    generics: Generics,
+    generics: Option<Generics>,
     where_clause: Option<WhereClause>,
     #[allow(dead_code)]
     brace: token::Brace,
@@ -163,6 +164,7 @@ impl Parse for StructGen {
         let conf_content;
 
         Ok(StructGen {
+            attrs: input.call(Attribute::parse_outer)?,
             visibility: {
                 if input.lookahead1().peek(Token![pub]) {
                     Some(input.parse()?)
@@ -170,7 +172,13 @@ impl Parse for StructGen {
                     None
                 }
             },
-            generics: input.parse()?,
+            generics: {
+                if input.lookahead1().peek(Token![<]) {
+                    Some(input.parse()?)
+                } else {
+                    None
+                }
+            },
             where_clause: {
                 if input.lookahead1().peek(Token![where]) {
                     Some(input.parse()?)
@@ -204,6 +212,7 @@ struct TypeArgumentConfiguration<'ast> {
 #[proc_macro]
 pub fn generate(input: TokenStream) -> TokenStream {
     let StructGen {
+        attrs: top_level_attrs,
         generics: parsed_generics,
         where_clause,
         fields: parsed_fields,
@@ -220,6 +229,7 @@ pub fn generate(input: TokenStream) -> TokenStream {
             let mut upsert_fields = Vec::<&Field>::new();
             let mut upsert_fields_names = LinkedHashSet::<String>::new();
             let mut attributes = Vec::<&Attribute>::new();
+            attributes.extend(top_level_attrs.iter());
             let mut is_tuple = false;
 
             for a in c.actions.iter() {
@@ -258,21 +268,27 @@ pub fn generate(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let generics: Vec<TypeArgumentConfiguration> = parsed_generics
-        .args
-        .iter()
-        .map(|arg| {
-            let mut collector = TypeArgumentsCollectorVisitor {
-                ..Default::default()
-            };
-            collector.visit_generic_argument(arg);
+    let generics: Vec<TypeArgumentConfiguration> = if parsed_generics.is_some() {
+        parsed_generics
+            .as_ref()
+            .unwrap()
+            .args
+            .iter()
+            .map(|arg| {
+                let mut collector = TypeArgumentsCollectorVisitor {
+                    ..Default::default()
+                };
+                collector.visit_generic_argument(arg);
 
-            TypeArgumentConfiguration {
-                arg,
-                identifiers: collector.items,
-            }
-        })
-        .collect();
+                TypeArgumentConfiguration {
+                    arg,
+                    identifiers: collector.items,
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
 
     let wheres: Vec<(&WherePredicate, Vec<&TypeArgumentConfiguration>)> = if where_clause.is_some()
     {
@@ -564,6 +580,51 @@ mod tests {
             struct Tupled(u64);
         }
         
+        "###);
+    }
+
+    #[test]
+    fn shared_attrs() {
+        insta::assert_snapshot!(run_for_fixture("shared_attrs"), @r###"
+        pub mod shared_attrs {
+            use structout::generate;
+            struct InheritsAttributes {
+                foo: u32,
+            }
+            #[automatically_derived]
+            #[allow(unused_qualifications)]
+            impl ::core::fmt::Debug for InheritsAttributes {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                    match *self {
+                        InheritsAttributes {
+                            foo: ref __self_0_0,
+                        } => {
+                            let mut debug_trait_builder = f.debug_struct("InheritsAttributes");
+                            let _ = debug_trait_builder.field("foo", &&(*__self_0_0));
+                            debug_trait_builder.finish()
+                        }
+                    }
+                }
+            }
+            struct InheritsAttributesTwo {
+                foo: u32,
+            }
+            #[automatically_derived]
+            #[allow(unused_qualifications)]
+            impl ::core::fmt::Debug for InheritsAttributesTwo {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                    match *self {
+                        InheritsAttributesTwo {
+                            foo: ref __self_0_0,
+                        } => {
+                            let mut debug_trait_builder = f.debug_struct("InheritsAttributesTwo");
+                            let _ = debug_trait_builder.field("foo", &&(*__self_0_0));
+                            debug_trait_builder.finish()
+                        }
+                    }
+                }
+            }
+        }
         "###);
     }
 }
